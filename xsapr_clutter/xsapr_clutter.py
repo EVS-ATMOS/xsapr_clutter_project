@@ -1,4 +1,3 @@
-import gc
 import numpy as np
 import pyart
 
@@ -46,7 +45,6 @@ def xsapr_clutter(files, out_file, clutter_threshold=0.0002,
             print(str(file), ' skipped',
                 radar.fields['reflectivity']['data'].shape)
         del radar
-        gc.collect()
         run_stats.push(reflect_array)
     mean = run_stats.mean()
     stdev = run_stats.standard_deviation()
@@ -105,6 +103,7 @@ def _clutter_to_dict(clutter_array):
     return clutter_dict
 
 
+# See http://stackoverflow.com/a/17637351/6392167
 class RunningStats:
     """ Calculated Mean, Variance and Standard Deviation, but
     uses the Welford algorithm to save memory. """
