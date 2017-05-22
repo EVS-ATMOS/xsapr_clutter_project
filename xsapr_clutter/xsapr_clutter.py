@@ -2,11 +2,12 @@ import numpy as np
 import pyart
 
 
-def xsapr_clutter(files, out_file, clutter_threshold=0.0002,
-                  radius=1):
+def xsapr_clutter(files, clutter_thres_min=0.0002,
+                  clutter_thres_max=1.5, radius=1,
+                  write_radar=False, out_file=None):
     """
     X-SAPR Wind Farm Clutter Calculation
-    
+
     Parameters
     ----------
     files : list
@@ -17,14 +18,23 @@ def xsapr_clutter(files, out_file, clutter_threshold=0.0002,
 
     Other Parameters
     ----------------
-    clutter_threshold : float
-        Threshold value for which, values obtained from
-        the radars reflectivity standard deviations divided by the
-        means, if any of these values are below the threshold,
-        they will be considered clutter.
+    clutter_thres_min : float
+        Threshold value for which, any clutter values above the
+        clutter_thres_min will be considered clutter, as long as they
+        are also below the clutter_thres_max.
+    clutter_thres_max : float
+        Threshold value for which, any clutter values below the
+        clutter_thres_max will be considered clutter, as long as they
+        are also above the clutter_thres_min.
     radius : int
         Radius of the area surrounding the clutter gate that will
         be also flagged as clutter.
+    write_radar : bool
+        Whether to or not, to write the clutter radar as a netCDF file.
+        Default is False.
+    out_file : string
+        String of location and filename to write the radar object too,
+        if write_radar is True.
 
     Returns
     -------
@@ -39,26 +49,28 @@ def xsapr_clutter(files, out_file, clutter_threshold=0.0002,
     for file in files:
         radar = pyart.io.read(file)
         if radar.fields[
-            'reflectivity']['data'].shape == (9200, 501):
+                'reflectivity']['data'].shape == (9200, 501):
             reflect_array = (radar.fields['reflectivity']['data'])
         else:
             print(str(file), ' skipped',
-                radar.fields['reflectivity']['data'].shape)
+                  radar.fields['reflectivity']['data'].shape)
         del radar
         run_stats.push(reflect_array)
     mean = run_stats.mean()
     stdev = run_stats.standard_deviation()
-    #new_means = expit(mean / 1000)
+    # new_means = expit(mean / 1000)
     clutter_values = stdev / mean
     clutter_array = _clutter_calculation(clutter_values,
-                                         clutter_threshold,
+                                         clutter_thres_min,
+                                         clutter_thres_max,
                                          radius)
     clutter_radar = pyart.io.read(files[0])
     clutter_radar.fields.clear()
     clutter_dict = _clutter_to_dict(clutter_array)
     clutter_radar.add_field('xsapr_clutter', clutter_dict,
                             replace_existing=True)
-    pyart.io.write_cfradial(out_file, clutter_radar)
+    if write_radar is True:
+        pyart.io.write_cfradial(out_file, clutter_radar)
     return clutter_radar
 
 
@@ -83,7 +95,7 @@ def _clutter_calculation(clutter_values, clutter_threshold,
                            gate - radius:gate + radius + 1]
         temp_array[ray - radius:ray + radius + 1,
                    gate - radius:gate + radius + 1] = np.logical_or(
-            frame, circle)
+                       frame, circle)
     temp_array = temp_array[radius:shape[0] + radius,
                             radius:shape[1] + radius]
     clutter_array = np.ma.array(temp_array, mask=mask)
@@ -103,10 +115,9 @@ def _clutter_to_dict(clutter_array):
     return clutter_dict
 
 
-# See http://stackoverflow.com/a/17637351/6392167
-class RunningStats:
-    """ Calculated Mean, Variance and Standard Deviation, but
-    uses the Welford algorithm to save memory. """
+# Adapted from http://stackoverflow.com/a/17637351/6392167
+class RunningStats():
+
     def __init__(self):
         self.n = 0
         self.old_m = 0
@@ -118,23 +129,32 @@ class RunningStats:
         self.n = 0
 
     def push(self, x):
-        self.n += 1
+        shape = x.shape
+        ones_arr = np.ones(shape)
+        mask = np.ma.getmask(x)
+        mask_ones = np.ma.array(ones_arr, mask=mask)
+        add_arr = np.ma.filled(mask_ones, fill_value=0.0)
+        self.n += add_arr
+        mask_n = np.ma.array(self.n, mask=mask)
+        fill_n = np.ma.filled(mask_n, fill_value=1.0)
 
-        if self.n == 1:
-            self.old_m = self.new_m = x
-            self.old_s = 0
+        if self.n.max() == 1.0:
+            self.old_m = self.new_m = np.ma.filled(x, 0.0)
+            self.old_s = np.zeros(shape)
         else:
-            self.new_m = self.old_m + (x - self.old_m) / self.n
-            self.new_s = self.old_s + (x - self.old_m) * (x - self.new_m)
+            self.new_m = np.nansum(np.dstack(
+                (self.old_m, (x-self.old_m) / fill_n)), 2)
+            self.new_s = np.nansum(np.dstack(
+                (self.old_s, (x-self.old_m) * (x-self.new_m))), 2)
 
             self.old_m = self.new_m
             self.old_s = self.new_s
 
     def mean(self):
-        return self.new_m if self.n else 0.0
+        return self.new_m if np.any(self.n) else 0.0
 
     def variance(self):
-        return self.new_s / (self.n - 1) if self.n > 1 else 0.0
+        return self.new_s / (self.n-1) if (self.n.max() > 1.0) else 0.0
 
     def standard_deviation(self):
         return np.sqrt(self.variance())
