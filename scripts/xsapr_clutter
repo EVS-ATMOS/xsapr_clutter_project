@@ -24,7 +24,7 @@ def main():
         help='Threshold where above the value is considered clutter.')
     parser.add_argument(
         '-ra', '--radius', type=int, default=1,
-        help='Threshold where above the value is flagged completely blocked.')
+        help='Size of circle radius for changing surrounding gates to clutter')
     args = parser.parse_args()
 
     print('')
