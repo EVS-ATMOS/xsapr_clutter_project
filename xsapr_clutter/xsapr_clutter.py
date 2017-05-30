@@ -2,8 +2,8 @@ import numpy as np
 import pyart
 
 
-def xsapr_clutter(files, clutter_thres_min=0.0002,
-                  clutter_thres_max=1.5, radius=1,
+def xsapr_clutter(files, clutter_thresh_min=0.0002,
+                  clutter_thresh_max=1.5, radius=1,
                   write_radar=False, out_file=None):
     """
     X-SAPR Wind Farm Clutter Calculation
@@ -18,11 +18,11 @@ def xsapr_clutter(files, clutter_thres_min=0.0002,
 
     Other Parameters
     ----------------
-    clutter_thres_min : float
+    clutter_thresh_min : float
         Threshold value for which, any clutter values above the
         clutter_thres_min will be considered clutter, as long as they
         are also below the clutter_thres_max.
-    clutter_thres_max : float
+    clutter_thresh_max : float
         Threshold value for which, any clutter values below the
         clutter_thres_max will be considered clutter, as long as they
         are also above the clutter_thres_min.
@@ -45,7 +45,7 @@ def xsapr_clutter(files, clutter_thres_min=0.0002,
 
     """
 
-    run_stats = RunningStats()
+    run_stats = _RunningStats()
     for file in files:
         radar = pyart.io.read(file)
         if radar.fields[
@@ -61,8 +61,8 @@ def xsapr_clutter(files, clutter_thres_min=0.0002,
     # new_means = expit(mean / 1000)
     clutter_values = stdev / mean
     clutter_array = _clutter_calculation(clutter_values,
-                                         clutter_thres_min,
-                                         clutter_thres_max,
+                                         clutter_thresh_min,
+                                         clutter_thresh_max,
                                          radius)
     clutter_radar = pyart.io.read(files[0])
     clutter_radar.fields.clear()
@@ -74,12 +74,14 @@ def xsapr_clutter(files, clutter_thres_min=0.0002,
     return clutter_radar
 
 
-def _clutter_calculation(clutter_values, clutter_threshold,
-                         radius):
+def _clutter_calculation(clutter_values, clutter_thresh_min,
+                         clutter_thresh_max, radius):
     """ Takes clutter_values(stdev/mean)and the clutter_threshold
     and calculates where X-SAPR wind farm clutter is occurring at
     the SGP ARM site. """
-    is_clutters = np.argwhere(clutter_values > clutter_threshold)
+    is_clutters = np.argwhere(
+        np.logical_and(clutter_values > clutter_thresh_min,
+                       clutter_values < clutter_thresh_max))
     shape = clutter_values.shape
     mask = np.ma.getmask(clutter_values)
     temp_array = np.zeros(shape)
@@ -116,7 +118,9 @@ def _clutter_to_dict(clutter_array):
 
 
 # Adapted from http://stackoverflow.com/a/17637351/6392167
-class RunningStats():
+class _RunningStats():
+    """ Calculated Mean, Variance and Standard Deviation, but
+    uses the Welford algorithm to save memory. """
 
     def __init__(self):
         self.n = 0
@@ -129,6 +133,9 @@ class RunningStats():
         self.n = 0
 
     def push(self, x):
+        """ Takes an array and the previous array and calculates mean,
+        variance and standard deviation, and continues to take multiple
+        arrays one at a time. """
         shape = x.shape
         ones_arr = np.ones(shape)
         mask = np.ma.getmask(x)
@@ -151,10 +158,13 @@ class RunningStats():
             self.old_s = self.new_s
 
     def mean(self):
+        """ Returns mean once all arrays are inputed. """
         return self.new_m if np.any(self.n) else 0.0
 
     def variance(self):
+        """ Returns variance once all arrays are inputed. """
         return self.new_s / (self.n-1) if (self.n.max() > 1.0) else 0.0
 
     def standard_deviation(self):
-        return np.sqrt(self.variance())
+        """ Returns standard deviation once all arrays are inputed. """
+        return np.ma.sqrt(self.variance())
