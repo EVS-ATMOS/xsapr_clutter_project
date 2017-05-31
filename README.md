@@ -9,3 +9,36 @@ as clutter depending on the radius integer.
 
 Currently checking other fields and components to see if they can be used
 to determine if a gate it clutter or not.
+
+To download:
+
+```
+git clone https://github.com/zssherman/xsapr_clutter_project.git
+```
+
+Then:
+
+```cd xsapr_clutter_project
+```
+
+Followed by:
+
+```
+python setup.py install
+```
+
+To use in the terminal:
+
+```
+xsapr_clutter <radar_directory> <reflect_shape> <out_file>
+```
+
+An example:
+
+```
+xsapr_clutter '/home/usr/clutter_data/03_05_2012/*' 5200 600 '/home/usr/clutter.nc 
+```
+
+There are optional arguments such as radius, and threshold min and max.
+This can be changed by adding ```-ra <int> -tmin <float> -tmax <float>``` to
+the command line.
