@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+""" Creates a clutter radar object by using a directory of files. """
+
+import argparse
+import glob
+
+from xsapr_clutter import xsapr_clutter
+
+def main():
+    """ Reads all radar files, does the clutter calculation and creates
+    a clutter radar object written in netCDF. """
+    # Creating func and argument parser for terminal use of xsapr_clutter.
+    parser = argparse.ArgumentParser(
+        description='Create a radar object with a clutter field.')
+    parser.add_argument(
+        'radar_directory', type=str, help='Directory of radar files.')
+    parser.add_argument(
+        'reflect_shape', nargs='+', type=int,
+        help='Ray number and gate number, the shape of the reflectivity data.')
+    parser.add_argument(
+        'out_file', type=str, help='Out file path and name to use.')
+    parser.add_argument(
+        '-tmax', '--clutter_thresh_max', type=float, default=1.5,
+        help='Threshold where below the value is considered clutter.')
+    parser.add_argument(
+        '-tmin', '--clutter_thresh_min', type=float, default=0.0002,
+        help='Threshold where above the value is considered clutter.')
+    parser.add_argument(
+        '-ra', '--radius', type=int, default=1,
+        help='Size of circle radius for changing surrounding gates to clutter')
+    args = parser.parse_args()
+
+    print('')
+    print('## Creating a radar object with a clutter field.')
+
+    files = glob.glob(args.radar_directory)
+    clutter_radar = xsapr_clutter(files,
+                                  reflect_shape=tuple(args.reflect_shape),
+                                  clutter_thresh_max=args.clutter_thresh_max,
+                                  clutter_thresh_min=args.clutter_thresh_min,
+                                  radius=args.radius, write_radar=True,
+                                  out_file=args.out_file)
+
+    del clutter_radar
+
+    print('## A netCDF radar object with the clutter field has been created.')
+
+if __name__ == '__main__':
+    main()
