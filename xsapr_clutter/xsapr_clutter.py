@@ -60,10 +60,14 @@ def xsapr_clutter(files, reflect_shape, clutter_thresh_min=0.0002,
     stdev = run_stats.standard_deviation()
     # new_means = expit(mean / 1000)
     clutter_values = stdev / mean
-    clutter_array = _clutter_calculation(clutter_values,
-                                         clutter_thresh_min,
-                                         clutter_thresh_max,
-                                         radius)
+
+    shape = clutter_values.shape
+    mask = np.ma.getmask(clutter_values)
+    is_clutters = np.argwhere(
+        np.logical_and(clutter_values > clutter_thresh_min,
+                       clutter_values < clutter_thresh_max))
+    clutter_array = _clutter_marker(is_clutters, shape, mask, radius)
+
     clutter_radar = pyart.io.read(files[0])
     clutter_radar.fields.clear()
     clutter_dict = _clutter_to_dict(clutter_array)
@@ -72,49 +76,6 @@ def xsapr_clutter(files, reflect_shape, clutter_thresh_min=0.0002,
     if write_radar is True:
         pyart.io.write_cfradial(out_file, clutter_radar)
     return clutter_radar
-
-
-def _clutter_calculation(clutter_values, clutter_thresh_min,
-                         clutter_thresh_max, radius):
-    """ Takes clutter_values(stdev/mean)and the clutter_threshold
-    and calculates where X-SAPR wind farm clutter is occurring at
-    the SGP ARM site. """
-    is_clutters = np.argwhere(
-        np.logical_and(clutter_values > clutter_thresh_min,
-                       clutter_values < clutter_thresh_max))
-    shape = clutter_values.shape
-    mask = np.ma.getmask(clutter_values)
-    temp_array = np.zeros(shape)
-    temp_array = np.pad(temp_array, radius,
-                        mode='constant', constant_values=-999)
-    is_clutters = is_clutters + radius
-    x_val, y_val = np.ogrid[-radius:(radius + 1),
-                            -radius:(radius + 1)]
-    circle = (x_val * x_val) + (y_val * y_val) <= (radius * radius)
-    for is_clutter in is_clutters:
-        ray, gate = is_clutter[0], is_clutter[1]
-        frame = temp_array[ray - radius:ray + radius + 1,
-                           gate - radius:gate + radius + 1]
-        temp_array[ray - radius:ray + radius + 1,
-                   gate - radius:gate + radius + 1] = np.logical_or(
-                       frame, circle)
-    temp_array = temp_array[radius:shape[0] + radius,
-                            radius:shape[1] + radius]
-    clutter_array = np.ma.array(temp_array, mask=mask)
-    return clutter_array
-
-
-def _clutter_to_dict(clutter_array):
-    """ Function that takes the clutter array
-    and turn it into a dictionary to be used and added
-    to the pyart radar object. """
-    clutter_dict = {}
-    clutter_dict['units'] = 'unitless'
-    clutter_dict['data'] = clutter_array
-    clutter_dict['standard_name'] = 'xsapr_clutter'
-    clutter_dict['long_name'] = 'X-SAPR Clutter'
-    clutter_dict['notes'] = '0: No Clutter, 1: Clutter'
-    return clutter_dict
 
 
 # Adapted from http://stackoverflow.com/a/17637351/6392167
@@ -168,3 +129,42 @@ class _RunningStats():
     def standard_deviation(self):
         """ Returns standard deviation once all arrays are inputed. """
         return np.ma.sqrt(self.variance())
+
+
+def _clutter_marker(is_clutters, shape, mask, radius):
+    """ Takes clutter_values(stdev/mean)and the clutter_threshold
+    and calculates where X-SAPR wind farm clutter is occurring at
+    the SGP ARM site. """
+    temp_array = np.zeros(shape)
+    # Inserting here possible other fields that can help distinguish
+    # whether a gate is clutter or not.
+    temp_array = np.pad(temp_array, radius,
+                        mode='constant', constant_values=-999)
+    is_clutters = is_clutters + radius
+    x_val, y_val = np.ogrid[-radius:(radius + 1),
+                            -radius:(radius + 1)]
+    circle = (x_val*x_val) + (y_val*y_val) <= (radius*radius)
+    for is_clutter in is_clutters:
+        ray, gate = is_clutter[0], is_clutter[1]
+        frame = temp_array[ray - radius:ray + radius + 1,
+                           gate - radius:gate + radius + 1]
+        temp_array[ray - radius:ray + radius + 1,
+                   gate - radius:gate + radius + 1] = np.logical_or(
+                       frame, circle)
+    temp_array = temp_array[radius:shape[0] + radius,
+                            radius:shape[1] + radius]
+    clutter_array = np.ma.array(temp_array, mask=mask)
+    return clutter_array
+
+
+def _clutter_to_dict(clutter_array):
+    """ Function that takes the clutter array
+    and turn it into a dictionary to be used and added
+    to the pyart radar object. """
+    clutter_dict = {}
+    clutter_dict['units'] = 'unitless'
+    clutter_dict['data'] = clutter_array
+    clutter_dict['standard_name'] = 'xsapr_clutter'
+    clutter_dict['long_name'] = 'X-SAPR Clutter'
+    clutter_dict['notes'] = '0: No Clutter, 1: Clutter'
+    return clutter_dict
