@@ -15,9 +15,6 @@ def main():
     parser.add_argument(
         'radar_directory', type=str, help='Directory of radar files.')
     parser.add_argument(
-        'reflect_shape', nargs='+', type=int,
-        help='Ray number and gate number, the shape of the reflectivity data.')
-    parser.add_argument(
         'out_file', type=str, help='Out file path and name to use.')
     parser.add_argument(
         '-tmax', '--clutter_thresh_max', type=float, default=1.5,
@@ -34,12 +31,10 @@ def main():
     print('## Creating a radar object with a clutter field.')
 
     files = glob.glob(args.radar_directory)
-    clutter_radar = xsapr_clutter(files,
-                                  reflect_shape=tuple(args.reflect_shape),
-                                  clutter_thresh_max=args.clutter_thresh_max,
-                                  clutter_thresh_min=args.clutter_thresh_min,
-                                  radius=args.radius, write_radar=True,
-                                  out_file=args.out_file)
+    clutter_radar = xsapr_clutter(
+        files, clutter_thresh_max=args.clutter_thresh_max,
+        clutter_thresh_min=args.clutter_thresh_min, radius=args.radius,
+        write_radar=True, out_file=args.out_file)
 
     del clutter_radar
 
