@@ -2,7 +2,7 @@ import numpy as np
 import pyart
 
 
-def xsapr_clutter(files, reflect_shape, clutter_thresh_min=0.0002,
+def xsapr_clutter(files, clutter_thresh_min=0.0002,
                   clutter_thresh_max=1.5, radius=1,
                   write_radar=False, out_file=None):
     """
@@ -12,9 +12,6 @@ def xsapr_clutter(files, reflect_shape, clutter_thresh_min=0.0002,
     ----------
     files : list
         List of radar files used for X-SAPR clutter calculation.
-    reflect_shape : tuple
-        Shape of the reflectivity array. Files with fields fitting this
-        shape will be used, if not, the file is skipped.
 
     Other Parameters
     ----------------
@@ -48,12 +45,7 @@ def xsapr_clutter(files, reflect_shape, clutter_thresh_min=0.0002,
     run_stats = _RunningStats()
     for file in files:
         radar = pyart.io.read(file)
-        if radar.fields[
-                'reflectivity']['data'].shape == reflect_shape:
-            reflect_array = (radar.fields['reflectivity']['data'])
-        else:
-            print(str(file), ' skipped',
-                  radar.fields['reflectivity']['data'].shape)
+        reflect_array = radar.fields['reflectivity']['data']
         del radar
         run_stats.push(reflect_array)
     mean = run_stats.mean()
