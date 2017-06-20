@@ -23,12 +23,12 @@ python setup.py install
 
 To use in the terminal:
 ```
-xsapr_clutter <radar_directory> <reflect_shape> <out_file>
+xsapr_clutter <radar_directory> <out_file>
 ```
 
 An example:
 ```
-xsapr_clutter '/home/usr/clutter_data/03_05_2012/*' 5200 600 '/home/usr/clutter.nc 
+xsapr_clutter '/home/usr/clutter_data/03_05_2012/*' '/home/usr/clutter.nc 
 ```
 
 There are optional arguments such as radius, and threshold min and max.
